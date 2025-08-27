@@ -42,7 +42,7 @@ func initDB() {
 		User:   "root",
 		Passwd: "190732Mert",
 		Net:    "tcp",
-		Addr:   "167.172.177.65",
+		Addr:   "127.0.0.1:3306",
 		DBName: "file_transfer_db",
 	}
 	var err error
