@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/smtp"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -13,7 +13,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/google/uuid"
-	"github.com/jordan-wright/email"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 var db *sql.DB
@@ -102,13 +103,47 @@ func downloadFile(c *fiber.Ctx) error {
 }
 
 func sendEmail(to, from, filename, link string) {
-	e := email.NewEmail()
-	e.From = from
-	e.To = []string{to}
-	e.Subject = "Yeni Dosya Transferi"
-	e.Text = []byte(fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi. İndirmek için: %s", from, filename, link))
-	err := e.Send("smtp.gmail.com:587", smtp.PlainAuth("", "mertseydim32@gmail.com", "inhr hdqd cize yfii", "smtp.gmail.com"))
+	apiKey := os.Getenv("SENDGRID_API_KEY")
+	if apiKey == "" {
+		log.Println("SENDGRID_API_KEY ortam değişkeni ayarlanmadı")
+		return
+	}
+
+	fromEmail := mail.NewEmail("Gönderen", from)
+	toEmail := mail.NewEmail("Alıcı", to)
+	subject := "Yeni Dosya Transferi"
+	plainTextContent := fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi. İndirmek için: %s", from, filename, link)
+	htmlContent := fmt.Sprintf(`
+	<!DOCTYPE html>
+	<html lang="tr">
+	<head>
+		<meta charset="UTF-8">
+		<style>
+			body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+			.container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); max-width: 600px; margin: auto; }
+			h2 { color: #007bff; }
+			p { margin: 10px 0; }
+			a { display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; }
+			a:hover { background-color: #0056b3; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h2>Yeni Dosya Transferi</h2>
+			<p>Merhaba,</p>
+			<p>%s size <strong>%s</strong> dosyasını gönderdi.</p>
+			<p>İndirmek için aşağıdaki bağlantıya tıklayın:</p>
+			<a href="%s">Dosyayı İndir</a>
+		</div>
+	</body>
+	</html>`, from, filename, link)
+
+	message := mail.NewSingleEmail(fromEmail, subject, toEmail, plainTextContent, htmlContent)
+	client := sendgrid.NewSendClient(apiKey)
+	response, err := client.Send(message)
 	if err != nil {
 		log.Println("Email gönderme hatası:", err)
+	} else if response.StatusCode != http.StatusAccepted {
+		log.Printf("Email gönderme başarısız: %d - %s\n", response.StatusCode, response.Body)
 	}
 }
