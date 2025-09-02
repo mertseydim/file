@@ -77,7 +77,7 @@ func uploadFile(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).SendString("Veritabanı hatası")
 	}
-	sendEmail(receiver, sender, file.Filename, fmt.Sprintf("http://localhost:3000/download/%s", link))
+	sendEmail(receiver, sender, file.Filename, fmt.Sprintf("https://mertseydim.com.tr/download/%s", link))
 	return c.SendString("Dosya yüklendi ve link gönderildi")
 }
 
