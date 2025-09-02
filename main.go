@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 var db *sql.DB
