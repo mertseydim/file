@@ -103,7 +103,7 @@ func downloadFile(c *fiber.Ctx) error {
 }
 
 func sendEmail(to, from, filename, link string) {
-	apiKey := os.Getenv("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")
+	apiKey := os.Getenv("TOKEN")
 	if apiKey == "" {
 		log.Println("SENDGRID_API_KEY ortam değişkeni ayarlanmadı")
 		return
