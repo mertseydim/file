@@ -8,20 +8,26 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/google/uuid"
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
-	_ "github.com/joho/godotenv/autoload"
 )
 
 var db *sql.DB
 
 func main() {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		// 10 GB örneği
+		BodyLimit:    10 * 1024 * 1024 * 1024,
+		ReadTimeout:  60 * time.Minute,
+		WriteTimeout: 60 * time.Minute,
+	})
 	app.Use(logger.New())
 
 	app.Static("/", "./public")
