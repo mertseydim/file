@@ -5,8 +5,10 @@ go 1.24.5
 require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gofiber/fiber/v2 v2.52.9
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
+	golang.org/x/crypto v0.14.0
 )
 
 require (
