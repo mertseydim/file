@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +17,7 @@
             padding: 20px;
             box-sizing: border-box;
         }
+
         .container {
             background-color: white;
             padding: 30px;
@@ -24,10 +26,12 @@
             width: 100%;
             max-width: 400px;
         }
+
         .tab-buttons {
             display: flex;
             margin-bottom: 20px;
         }
+
         .tab-button {
             flex: 1;
             padding: 10px;
@@ -37,26 +41,34 @@
             border-radius: 4px 4px 0 0;
             font-weight: bold;
         }
+
         .tab-button.active {
             background-color: #007bff;
             color: white;
         }
+
         .tab-content {
             display: none;
         }
+
         .tab-content.active {
             display: block;
         }
+
         h2 {
             margin-top: 0;
             color: #333;
         }
+
         label {
             display: block;
             margin: 10px 0 5px;
             font-weight: bold;
         }
-        input[type="email"], input[type="password"], input[type="file"] {
+
+        input[type="email"],
+        input[type="password"],
+        input[type="file"] {
             width: 100%;
             padding: 10px;
             margin-bottom: 15px;
@@ -64,6 +76,7 @@
             border-radius: 4px;
             box-sizing: border-box;
         }
+
         button {
             width: 100%;
             padding: 10px;
@@ -74,33 +87,42 @@
             cursor: pointer;
             font-size: 16px;
         }
+
         button:hover {
             background-color: #0056b3;
         }
+
         button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
+
         .error {
             color: #dc3545;
             margin-top: 10px;
             font-size: 14px;
         }
+
         .success {
             color: #28a745;
             margin-top: 10px;
             font-size: 14px;
         }
+
         #upload-section {
-            display: none; /* Hidden until logged in */
+            display: none;
+            /* Hidden until logged in */
         }
+
         .logout {
             background-color: #dc3545;
             margin-top: 10px;
         }
+
         .logout:hover {
             background-color: #c82333;
         }
+
         .file-info {
             font-size: 12px;
             color: #666;
@@ -109,6 +131,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="tab-buttons">
@@ -122,10 +145,10 @@
             <form id="register-form">
                 <label for="reg-email">Email</label>
                 <input type="email" id="reg-email" required>
-                
+
                 <label for="reg-password">Şifre (En az 8 karakter)</label>
                 <input type="password" id="reg-password" minlength="8" required>
-                
+
                 <button type="submit">Kayıt Ol</button>
                 <div id="reg-message"></div>
             </form>
@@ -137,10 +160,10 @@
             <form id="login-form">
                 <label for="login-email">Email</label>
                 <input type="email" id="login-email" required>
-                
+
                 <label for="login-password">Şifre</label>
                 <input type="password" id="login-password" required>
-                
+
                 <button type="submit">Giriş Yap</button>
                 <div id="login-message"></div>
             </form>
@@ -153,14 +176,14 @@
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="sender">Gönderen Email (Senin emailin)</label>
                 <input type="email" id="sender" name="sender" readonly>
-                
+
                 <label for="receiver">Alıcı Email</label>
                 <input type="email" id="receiver" name="receiver" required>
-                
+
                 <label for="file">Dosya Seç (Max 1GB)</label>
                 <input type="file" id="file" name="file" required>
                 <div class="file-info">Maksimum dosya boyutu: 1GB</div>
-                
+
                 <button type="submit">Yükle ve Gönder</button>
                 <div id="upload-message"></div>
             </form>
@@ -177,7 +200,7 @@
 
             // Show selected tab
             document.getElementById(tabName).classList.add('active');
-            
+
             // Activate corresponding button
             const button = document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`);
             if (button) {
@@ -203,87 +226,88 @@
         }
 
         // Register form handler
-        document.getElementById('register-form').addEventListener('submit', function(e) {
+        document.getElementById('register-form').addEventListener('submit', function (e) {
             e.preventDefault();
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const messageDiv = document.getElementById('reg-message');
-            
+
             fetch('/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.message) {
-                    messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
-                    // Auto-switch to login after successful register
-                    showTab('login');
-                } else {
-                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                }
-            })
-            .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
+                        // Auto-switch to login after successful register
+                        showTab('login');
+                    } else {
+                        messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    }
+                })
+                .catch(err => {
+                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                });
         });
 
         // Login form handler
-        document.getElementById('login-form').addEventListener('submit', function(e) {
+        document.getElementById('login-form').addEventListener('submit', function (e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const messageDiv = document.getElementById('login-message');
-            
+
             fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.token) {
-                    localStorage.setItem('jwt_token', data.token);
-                    localStorage.setItem('user_email', email);
-                    messageDiv.innerHTML = `<div class="success">Giriş başarılı! Yönlendiriliyor...</div>`;
-                    document.getElementById('sender').value = email;
-                    document.getElementById('upload-section').style.display = 'block';
-                    document.querySelector('.tab-buttons').style.display = 'none'; // Hide tabs after login
-                    setTimeout(() => showTab('upload'), 1000);
-                } else {
-                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                }
-            })
-            .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.token) {
+                        localStorage.setItem('jwt_token', data.token);
+                        localStorage.setItem('user_email', email);
+                        messageDiv.innerHTML = `<div class="success">Giriş başarılı! Yönlendiriliyor...</div>`;
+                        document.getElementById('sender').value = email;
+                        document.getElementById('upload-section').style.display = 'block';
+                        document.querySelector('.tab-buttons').style.display = 'none'; // Hide tabs after login
+                        setTimeout(() => showTab('upload'), 1000);
+                    } else {
+                        messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                    }
+                })
+                .catch(err => {
+                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                });
         });
 
         // Upload form handler (with JWT)
-        document.getElementById('upload-form').addEventListener('submit', function(e) {
+        document.getElementById('upload-form').addEventListener('submit', function (e) {
             e.preventDefault();
             const formData = new FormData(this);
             const token = localStorage.getItem('jwt_token');
             const messageDiv = document.getElementById('upload-message');
-            
+
             fetch('/upload', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             })
-            .then(response => response.text())
-            .then(data => {
-                if (response.ok) {
-                    messageDiv.innerHTML = `<div class="success">${data}</div>`;
-                    this.reset(); // Clear form
-                } else {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
-                }
-            })
-            .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-            });
+                .then(async response => {
+                    const data = await response.text()
+
+                    if (response.ok) {
+                        messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                        this.reset(); // Clear form
+                    } else {
+                        messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
+                    }
+                })
+                .catch(err => {
+                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                });
         });
 
         // Logout
@@ -299,4 +323,5 @@
         }
     </script>
 </body>
+
 </html>
