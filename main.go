@@ -403,21 +403,48 @@ func getHistory(c *fiber.Ctx) error {
 	// Log for debugging
 	log.Printf("Fetching history for user ID: %v", int(userID))
 
-	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", int(userID))
+	// Önce kullanıcının varlığını kontrol et
+	var userExists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", int(userID)).Scan(&userExists)
+	if err != nil {
+		log.Printf("User existence check error: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Kullanıcı kontrolü hatası"})
+	}
+	if !userExists {
+		log.Printf("User not found with ID: %v", int(userID))
+		return c.Status(404).JSON(fiber.Map{"error": "Kullanıcı bulunamadı"})
+	}
+
+	// Gönderim geçmişini sorgula
+	rows, err := db.Query(`
+		SELECT 
+			COALESCE(file_name, '') as file_name,
+			COALESCE(file_size, 0) as file_size,
+			COALESCE(receiver_email, '') as receiver_email,
+			created_at
+		FROM files 
+		WHERE sender_id = ? 
+		ORDER BY created_at DESC`, int(userID))
 	if err != nil {
 		log.Printf("History DB query error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 	defer rows.Close()
 
-	var history []fiber.Map
+	history := make([]fiber.Map, 0)
 	for rows.Next() {
-		var fileName, receiverEmail string
-		var fileSize int64
-		var createdAt time.Time
+		var (
+			fileName, receiverEmail string
+			fileSize                int64
+			createdAt               time.Time
+		)
+
 		if err := rows.Scan(&fileName, &fileSize, &receiverEmail, &createdAt); err != nil {
 			log.Printf("History scan error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "Sorgu hatası"})
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "Veri okuma hatası",
+				"details": err.Error(),
+			})
 		}
 		history = append(history, fiber.Map{
 			"file_name":      fileName,
@@ -425,6 +452,12 @@ func getHistory(c *fiber.Ctx) error {
 			"receiver_email": receiverEmail,
 			"created_at":     createdAt.Format("2006-01-02 15:04:05"),
 		})
+	}
+
+	// Sorgu sırasında oluşan hataları kontrol et
+	if err = rows.Err(); err != nil {
+		log.Printf("Row iteration error: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Veri okuma hatası"})
 	}
 
 	return c.JSON(history)

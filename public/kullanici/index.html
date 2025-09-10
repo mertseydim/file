@@ -226,6 +226,8 @@
         // Load history
         async function loadHistory() {
             const token = localStorage.getItem('jwt_token');
+            console.log('Loading history with token:', token);
+            
             const tableBody = document.getElementById('history-table').querySelector('tbody');
             tableBody.innerHTML = '';
 
@@ -265,6 +267,13 @@
                 });
             } catch (error) {
                 console.error('Geçmiş yüklenirken hata:', error);
+                const errorMessage = document.createElement('tr');
+                errorMessage.innerHTML = `
+                    <td colspan="4" style="text-align: center; padding: 20px; color: #dc3545;">
+                        ${error.message}
+                    </td>
+                `;
+                tableBody.appendChild(errorMessage);
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td colspan="4" style="text-align: center; padding: 20px; color: #dc3545;">
