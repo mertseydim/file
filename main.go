@@ -313,12 +313,12 @@ func getHistory(c *fiber.Ctx) error {
 
 			return c.Status(500).JSON(fiber.Map{"error": "Sorgu hatası"})
 		}
-		loc, _ := time.LoadLocation("Europe/Istanbul")
+		createdAt = createdAt.Add(3 * time.Hour)
 		history = append(history, fiber.Map{
 			"file_name":      fileName,
 			"file_size":      fileSize,
 			"receiver_email": receiverEmail,
-			"created_at":     createdAt.In(loc).Format("2006-01-02 15:04:05"),
+			"created_at":     createdAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
