@@ -67,6 +67,11 @@ func main() {
 		return c.SendFile("./public/kullanici/index.html")
 	})
 
+	// Profil sayfası route'u (auth gerektiriyor)
+	app.Get("/profile", authMiddleware, func(c *fiber.Ctx) error {
+		return c.SendFile("./public/profile/index.html")
+	})
+
 	app.Post("/register", register)
 	app.Post("/login", login)
 	app.Post("/upload", uploadFile)
