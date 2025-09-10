@@ -45,6 +45,8 @@
             font-size: 16px;
             color: #555;
             transition: color 0.3s, border-bottom 0.3s;
+            text-decoration: none;
+            text-align: center;
         }
         .tab-button.active {
             color: #007bff;
@@ -52,6 +54,7 @@
         }
         .tab-button:hover {
             color: #0056b3;
+            text-decoration: none;
         }
         .tab-content {
             display: none;
@@ -188,40 +191,28 @@
 <body>
     <div class="container">
         <div class="tab-buttons">
-            <button class="tab-button active" onclick="showTab('register')">Kayıt Ol</button>
-            <button class="tab-button" onclick="showTab('login')">Giriş Yap</button>
-            <button class="tab-button" onclick="showTab('guest')">Misafir Olarak Gönder</button>
+            <a href="/kayit" class="tab-button">Kayıt Ol</a>
+            <a href="/giris" class="tab-button">Giriş Yap</a>
+            <button class="tab-button active" onclick="showTab('guest')">Misafir Olarak Gönder</button>
         </div>
 
-        <!-- Register Tab -->
-        <div id="register" class="tab-content active">
-            <h2>Kayıt Ol</h2>
-            <form id="register-form">
-                <label for="reg-email">Email</label>
-                <input type="email" id="reg-email" required>
+        <!-- Guest Tab -->
+        <div id="guest" class="tab-content active">
+            <h2>Misafir Olarak Gönder</h2>
+            <form id="guest-form" enctype="multipart/form-data">
+                <label for="guest-sender">Gönderen Email</label>
+                <input type="email" id="guest-sender" name="sender" required>
                 
-                <label for="reg-password">Şifre (En az 8 karakter)</label>
-                <input type="password" id="reg-password" minlength="8" required>
+                <label for="guest-receiver">Alıcı Email</label>
+                <input type="email" id="guest-receiver" name="receiver" required>
                 
-                <button type="submit">Kayıt Ol</button>
-                <div id="reg-message"></div>
+                <label for="guest-file">Dosya Seç (Max 1GB)</label>
+                <input type="file" id="guest-file" name="file" required>
+                <div class="file-info">Maksimum dosya boyutu: 1GB</div>
+                
+                <button type="submit"><span>Yükle ve Gönder</span><div class="spinner"></div></button>
+                <div id="guest-message"></div>
             </form>
-        </div>
-
-        <!-- Login Tab -->
-        <div id="login" class="tab-content">
-            <h2>Giriş Yap</h2>
-            <form id="login-form">
-                <label for="login-email">Email</label>
-                <input type="email" id="login-email" required>
-                
-                <label for="login-password">Şifre</label>
-                <input type="password" id="login-password" required>
-                
-                <button type="submit">Giriş Yap</button>
-                <div id="login-message"></div>
-            </form>
-        </div>
 
         <!-- Guest Tab -->
         <div id="guest" class="tab-content">
@@ -309,79 +300,39 @@
             document.querySelector('.tab-buttons').style.display = 'none';
         }
 
-        // Register handler
-        document.getElementById('register-form').addEventListener('submit', function(e) {
+        // Auto-redirect if logged in
+        if (isLoggedIn()) {
+            window.location.href = '/';
+        }
+
+        // Guest upload handler (no token)
+        document.getElementById('guest-form').addEventListener('submit', function(e) {
             e.preventDefault();
-            const email = document.getElementById('reg-email').value;
-            const password = document.getElementById('reg-password').value;
-            const messageDiv = document.getElementById('reg-message');
+            const formData = new FormData(this);
+            const messageDiv = document.getElementById('guest-message');
             const button = this.querySelector('button');
+            button.classList.add('loading');
             button.disabled = true;
 
-            fetch('/register', {
+            fetch('/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: formData
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Hata: ${response.statusText}`);
+                    throw new Error(response.statusText || 'Sunucu hatası');
                 }
-                return response.json();
+                return response.text();
             })
             .then(data => {
-                if (data.message) {
-                    messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
-                    showTab('login');
-                } else {
-                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                }
+                messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                this.reset();
             })
             .catch(err => {
                 messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
             })
             .finally(() => {
-                button.disabled = false;
-            });
-        });
-
-        // Login handler
-        document.getElementById('login-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const messageDiv = document.getElementById('login-message');
-            const button = this.querySelector('button');
-            button.disabled = true;
-
-            fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Hata: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.token) {
-                    localStorage.setItem('jwt_token', data.token);
-                    localStorage.setItem('user_email', email);
-                    messageDiv.innerHTML = `<div class="success">Giriş başarılı! Yönlendiriliyor...</div>`;
-                    document.getElementById('sender').value = email;
-                    document.getElementById('upload-section').style.display = 'block';
-                    document.querySelector('.tab-buttons').style.display = 'none';
-                    setTimeout(() => showTab('upload'), 1000);
-                } else {
-                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                }
-            })
-            .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
-            })
-            .finally(() => {
+                button.classList.remove('loading');
                 button.disabled = false;
             });
         });
