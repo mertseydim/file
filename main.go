@@ -464,9 +464,9 @@ func sendEmail(to, from, filename string, fileSize int64, fileType, link string)
 	// Format file size for readability (e.g., KB, MB)
 	fileSizeStr := formatFileSize(fileSize)
 
-	fromEmail := mail.NewEmail("SeydimDosya", from)
+	fromEmail := mail.NewEmail("SeydimDosya", "mertseydim@gmail.com")
 	toEmail := mail.NewEmail("Alıcı", to)
-	subject := "Yeni Dosya Transferi"
+	subject := fmt.Sprintf("Yeni Dosya Transferi - Gönderen: %s", from)
 	plainTextContent := fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi.\nDosya Türü: %s\nBoyut: %s\nİndirmek için: %s", from, filename, fileType, fileSizeStr, link)
 	htmlContent := fmt.Sprintf(`
 	<!DOCTYPE html>
