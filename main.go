@@ -400,7 +400,10 @@ func getHistory(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Geçersiz kullanıcı kimliği"})
 	}
 
-	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", userID)
+	// Log for debugging
+	log.Printf("Fetching history for user ID: %v", int(userID))
+
+	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", int(userID))
 	if err != nil {
 		log.Printf("History DB query error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})

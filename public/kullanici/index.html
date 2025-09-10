@@ -237,10 +237,22 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Geçmiş yüklenemedi');
+                    const error = await response.json();
+                    throw new Error(error.error || 'Geçmiş yüklenemedi');
                 }
 
                 const history = await response.json();
+                if (history.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td colspan="4" style="text-align: center; padding: 20px;">
+                            Henüz dosya gönderimi yapılmamış
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                    return;
+                }
+
                 history.forEach(item => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
@@ -253,6 +265,13 @@
                 });
             } catch (error) {
                 console.error('Geçmiş yüklenirken hata:', error);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="4" style="text-align: center; padding: 20px; color: #dc3545;">
+                        Geçmiş yüklenirken bir hata oluştu: ${error.message}
+                    </td>
+                `;
+                tableBody.appendChild(row);
             }
         }
 
