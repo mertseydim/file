@@ -82,7 +82,7 @@ func initDB() {
 		DBName: "file_transfer_db",
 		Params: map[string]string{
 			"parseTime": "true",
-			"loc":       "Europe%2FIstanbul", // Türkiye saati için
+			"loc":       "Europe/Istanbul",
 		},
 	}
 	var err error
