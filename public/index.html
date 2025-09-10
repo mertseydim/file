@@ -300,9 +300,12 @@
             document.querySelector('.tab-buttons').style.display = 'none';
         }
 
-        // Auto-redirect if logged in
+        // Check authentication and show appropriate content
         if (isLoggedIn()) {
-            window.location.href = '/';
+            document.getElementById('upload-section').style.display = 'block';
+            document.querySelector('.tab-buttons').style.display = 'none';
+            document.getElementById('guest').style.display = 'none';
+            document.getElementById('sender').value = localStorage.getItem('user_email');
         }
 
         // Guest upload handler (no token)
