@@ -16,11 +16,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -47,8 +47,24 @@ func main() {
 
 	app.Static("/", "./public")
 
+	// Ana sayfa route'u
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendFile("./public/index.html")
+	})
+
+	// Giriş sayfası route'u
+	app.Get("/giris", func(c *fiber.Ctx) error {
+		return c.SendFile("./public/giris/index.html")
+	})
+
+	// Kayıt sayfası route'u
+	app.Get("/kayit", func(c *fiber.Ctx) error {
+		return c.SendFile("./public/kayit/index.html")
+	})
+
+	// Kullanıcı paneli route'u (auth gerektiriyor)
+	app.Get("/kullanici", authMiddleware, func(c *fiber.Ctx) error {
+		return c.SendFile("./public/kullanici/index.html")
 	})
 
 	app.Post("/register", register)
@@ -199,7 +215,11 @@ func login(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Token oluşturma hatası"})
 	}
 
-	return c.JSON(fiber.Map{"token": tokenString})
+	return c.JSON(fiber.Map{
+		"token":   tokenString,
+		"user_id": id,
+		"email":   req.Email,
+	})
 }
 
 func jwtMiddleware(c *fiber.Ctx) error {
@@ -230,6 +250,39 @@ func jwtMiddleware(c *fiber.Ctx) error {
 		log.Printf("Invalid user_id in claims")
 		return c.Status(500).JSON(fiber.Map{"error": "Geçersiz kullanıcı kimliği"})
 	}
+	c.Locals("user_id", userID)
+	c.Locals("user_email", claims["email"])
+
+	return c.Next()
+}
+
+// authMiddleware sayfaya erişim için auth kontrolü yapar ve giriş sayfasına yönlendirir
+func authMiddleware(c *fiber.Ctx) error {
+	auth := c.Get("Authorization")
+	if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+		return c.Redirect("/giris")
+	}
+	tokenString := strings.TrimPrefix(auth, "Bearer ")
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		return c.Redirect("/giris")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Redirect("/giris")
+	}
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return c.Redirect("/giris")
+	}
+
 	c.Locals("user_id", userID)
 	c.Locals("user_email", claims["email"])
 
