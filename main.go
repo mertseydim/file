@@ -16,17 +16,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
 	db        *sql.DB
 	appDomain string
-	jwtSecret = []byte(os.Getenv("JWT_SECRET")) // New: Load from env
+	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	if appDomain == "" {
 		appDomain = "http://localhost:3000"
 	}
-	if string(jwtSecret) == "" { // New: Check JWT secret
+	if string(jwtSecret) == "" {
 		log.Fatal("JWT_SECRET environment variable not set")
 	}
 
@@ -51,11 +51,12 @@ func main() {
 		return c.SendFile("./public/index.html")
 	})
 
-	// New: Registration and login routes
 	app.Post("/register", register)
 	app.Post("/login", login)
 
-	app.Post("/upload", jwtMiddleware, uploadFile)
+	app.Post("/upload", uploadFile)
+
+	app.Get("/history", jwtMiddleware, getHistory) // New: Protected history endpoint
 
 	app.Get("/download/:link", downloadFile)
 
@@ -89,13 +90,14 @@ func initDB() {
 		log.Fatal(err)
 	}
 
-	// Existing files table
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS files (
 			id INT AUTO_INCREMENT PRIMARY KEY,
+			sender_id INT,
 			sender_email VARCHAR(255),
 			receiver_email VARCHAR(255),
 			file_name VARCHAR(255),
+			file_size BIGINT,
 			file_path VARCHAR(512),
 			download_link VARCHAR(36) UNIQUE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -105,7 +107,6 @@ func initDB() {
 		log.Fatal("Failed to create files table:", err)
 	}
 
-	// New: Users table
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INT AUTO_INCREMENT PRIMARY KEY,
@@ -119,7 +120,6 @@ func initDB() {
 	}
 }
 
-// New: Registration handler
 func register(c *fiber.Ctx) error {
 	type RegisterRequest struct {
 		Email    string `json:"email"`
@@ -130,7 +130,6 @@ func register(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz istek"})
 	}
 
-	// Validate email and password
 	if !isValidEmail(req.Email) {
 		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz email formatı"})
 	}
@@ -138,7 +137,6 @@ func register(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Şifre en az 8 karakter olmalı"})
 	}
 
-	// Check if email exists
 	var exists int
 	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", req.Email).Scan(&exists)
 	if err != nil {
@@ -148,13 +146,11 @@ func register(c *fiber.Ctx) error {
 		return c.Status(409).JSON(fiber.Map{"error": "Bu email zaten kayıtlı"})
 	}
 
-	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Şifre hashleme hatası"})
 	}
 
-	// Insert user
 	_, err = db.Exec("INSERT INTO users (email, password_hash) VALUES (?, ?)", req.Email, hash)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Kayıt hatası"})
@@ -163,7 +159,6 @@ func register(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Kullanıcı başarıyla kaydedildi"})
 }
 
-// New: Login handler
 func login(c *fiber.Ctx) error {
 	type LoginRequest struct {
 		Email    string `json:"email"`
@@ -174,7 +169,6 @@ func login(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz istek"})
 	}
 
-	// Fetch user
 	var id int
 	var hash string
 	err := db.QueryRow("SELECT id, password_hash FROM users WHERE email = ?", req.Email).Scan(&id, &hash)
@@ -184,16 +178,14 @@ func login(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 
-	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Password)); err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Geçersiz email veya şifre"})
 	}
 
-	// Generate JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": id,
 		"email":   req.Email,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(), // 24-hour expiration
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
@@ -203,7 +195,6 @@ func login(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"token": tokenString})
 }
 
-// New: JWT middleware (optional, apply to protected routes)
 func jwtMiddleware(c *fiber.Ctx) error {
 	auth := c.Get("Authorization")
 	if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
@@ -221,21 +212,46 @@ func jwtMiddleware(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "Geçersiz token"})
 	}
 
-	// Optional: Set user context
 	claims := token.Claims.(jwt.MapClaims)
+	c.Locals("user_id", claims["user_id"])
 	c.Locals("user_email", claims["email"])
 
 	return c.Next()
 }
 
-// Helper: Basic email validation
-func isValidEmail(email string) bool {
-	return regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`).MatchString(email)
-}
-
 func uploadFile(c *fiber.Ctx) error {
-	sender := c.Locals("user_email").(string)
+	var sender string
+	var senderID *int // Nullable for guests
+	auth := c.Get("Authorization")
+	if auth != "" && strings.HasPrefix(auth, "Bearer ") {
+		// Authenticated: Validate token
+		tokenString := strings.TrimPrefix(auth, "Bearer ")
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method")
+			}
+			return jwtSecret, nil
+		})
+		if err != nil || !token.Valid {
+			return c.Status(401).JSON(fiber.Map{"error": "Geçersiz token"})
+		}
+		claims := token.Claims.(jwt.MapClaims)
+		sender = claims["email"].(string)
+		id := int(claims["user_id"].(float64))
+		senderID = &id
+	} else {
+		// Guest: Use form sender
+		sender = c.FormValue("sender")
+		if sender == "" || !isValidEmail(sender) {
+			return c.Status(400).SendString("Geçersiz gönderen email")
+		}
+	}
+
 	receiver := c.FormValue("receiver")
+	if receiver == "" || !isValidEmail(receiver) {
+		return c.Status(400).SendString("Geçersiz alıcı email")
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		return c.Status(400).SendString("Dosya yüklenemedi")
@@ -244,7 +260,6 @@ func uploadFile(c *fiber.Ctx) error {
 		return c.Status(400).SendString("Dosya 1GB'dan büyük")
 	}
 
-	// Sanitize filename
 	safeFilename := sanitizeFilename(file.Filename)
 
 	link := uuid.New().String()
@@ -257,10 +272,10 @@ func uploadFile(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Dosya kaydetme hatası")
 	}
 
-	_, err = db.Exec("INSERT INTO files (sender_email, receiver_email, file_name, file_path, download_link) VALUES (?, ?, ?, ?, ?)",
-		sender, receiver, file.Filename, path, link)
+	_, err = db.Exec("INSERT INTO files (sender_id, sender_email, receiver_email, file_name, file_size, file_path, download_link) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		senderID, sender, receiver, file.Filename, file.Size, path, link)
 	if err != nil {
-		os.Remove(path) // Cleanup on failure
+		os.Remove(path)
 		return c.Status(500).SendString("Veritabanı hatası")
 	}
 
@@ -271,6 +286,34 @@ func uploadFile(c *fiber.Ctx) error {
 	}
 
 	return c.SendString("Dosya yüklendi ve link gönderildi")
+}
+
+func getHistory(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64) // From JWT
+
+	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", userID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
+	}
+	defer rows.Close()
+
+	var history []fiber.Map
+	for rows.Next() {
+		var fileName, receiverEmail string
+		var fileSize int64
+		var createdAt time.Time
+		if err := rows.Scan(&fileName, &fileSize, &receiverEmail, &createdAt); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Sorgu hatası"})
+		}
+		history = append(history, fiber.Map{
+			"file_name":      fileName,
+			"file_size":      fileSize,
+			"receiver_email": receiverEmail,
+			"created_at":     createdAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	return c.JSON(history)
 }
 
 func downloadFile(c *fiber.Ctx) error {
@@ -292,11 +335,8 @@ func downloadFile(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Cleanup: Delete file and DB entry after download
-	defer func() {
-		os.Remove(path)
-		db.Exec("DELETE FROM files WHERE download_link = ?", link)
-	}()
+	// Cleanup: Delete file only, keep DB record for history
+	defer os.Remove(path)
 
 	return nil
 }
@@ -348,7 +388,10 @@ func sendEmail(to, from, filename, link string) error {
 	return nil
 }
 
-// Helper to sanitize filename
+func isValidEmail(email string) bool {
+	return regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`).MatchString(email)
+}
+
 func sanitizeFilename(name string) string {
 	name = filepath.Base(name)
 	invalidChars := regexp.MustCompile(`[/:*?"<>|\\]`)

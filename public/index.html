@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="tr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dosya Transferi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -16,127 +16,157 @@
             margin: 0;
             padding: 20px;
             box-sizing: border-box;
+            color: #333;
         }
-
         .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
+            transition: transform 0.3s ease;
         }
-
+        .container:hover {
+            transform: translateY(-5px);
+        }
         .tab-buttons {
             display: flex;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e0e0e0;
         }
-
         .tab-button {
             flex: 1;
-            padding: 10px;
-            background-color: #f8f9fa;
+            padding: 12px;
+            background-color: transparent;
             border: none;
             cursor: pointer;
-            border-radius: 4px 4px 0 0;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 16px;
+            color: #555;
+            transition: color 0.3s, border-bottom 0.3s;
         }
-
         .tab-button.active {
-            background-color: #007bff;
-            color: white;
+            color: #007bff;
+            border-bottom: 3px solid #007bff;
         }
-
+        .tab-button:hover {
+            color: #0056b3;
+        }
         .tab-content {
             display: none;
         }
-
         .tab-content.active {
             display: block;
         }
-
         h2 {
             margin-top: 0;
-            color: #333;
+            color: #007bff;
+            font-size: 24px;
+            text-align: center;
         }
-
         label {
             display: block;
-            margin: 10px 0 5px;
-            font-weight: bold;
+            margin: 15px 0 5px;
+            font-weight: 700;
+            color: #444;
         }
-
-        input[type="email"],
-        input[type="password"],
-        input[type="file"] {
+        input[type="email"], input[type="password"], input[type="file"] {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
             box-sizing: border-box;
+            transition: border-color 0.3s;
         }
-
+        input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
         button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 16px;
+            font-weight: 700;
+            transition: background-color 0.3s, transform 0.2s;
         }
-
         button:hover {
             background-color: #0056b3;
+            transform: scale(1.02);
         }
-
         button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
         }
-
         .error {
             color: #dc3545;
             margin-top: 10px;
             font-size: 14px;
+            text-align: center;
         }
-
         .success {
             color: #28a745;
             margin-top: 10px;
             font-size: 14px;
+            text-align: center;
         }
-
-        #upload-section {
+        #upload-section, #guest-section, #history-section {
             display: none;
-            /* Hidden until logged in */
         }
-
         .logout {
             background-color: #dc3545;
-            margin-top: 10px;
+            margin-top: 15px;
         }
-
         .logout:hover {
             background-color: #c82333;
         }
-
         .file-info {
-            font-size: 12px;
+            font-size: 13px;
             color: #666;
-            margin-top: -5px;
-            margin-bottom: 15px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .welcome {
+            text-align: center;
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+        }
+        #history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        #history-table th, #history-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        #history-table th {
+            background-color: #f2f2f2;
+        }
+        .view-history {
+            background-color: #28a745;
+            margin-bottom: 10px;
+        }
+        .view-history:hover {
+            background-color: #218838;
         }
     </style>
 </head>
-
 <body>
     <div class="container">
         <div class="tab-buttons">
             <button class="tab-button active" onclick="showTab('register')">Kayıt Ol</button>
             <button class="tab-button" onclick="showTab('login')">Giriş Yap</button>
+            <button class="tab-button" onclick="showTab('guest')">Misafir Olarak Gönder</button>
         </div>
 
         <!-- Register Tab -->
@@ -145,10 +175,10 @@
             <form id="register-form">
                 <label for="reg-email">Email</label>
                 <input type="email" id="reg-email" required>
-
+                
                 <label for="reg-password">Şifre (En az 8 karakter)</label>
                 <input type="password" id="reg-password" minlength="8" required>
-
+                
                 <button type="submit">Kayıt Ol</button>
                 <div id="reg-message"></div>
             </form>
@@ -160,33 +190,67 @@
             <form id="login-form">
                 <label for="login-email">Email</label>
                 <input type="email" id="login-email" required>
-
+                
                 <label for="login-password">Şifre</label>
                 <input type="password" id="login-password" required>
-
+                
                 <button type="submit">Giriş Yap</button>
                 <div id="login-message"></div>
             </form>
         </div>
 
-        <!-- Upload Tab (Shown after login) -->
+        <!-- Guest Tab -->
+        <div id="guest" class="tab-content">
+            <h2>Misafir Olarak Gönder</h2>
+            <form id="guest-form" enctype="multipart/form-data">
+                <label for="guest-sender">Gönderen Email</label>
+                <input type="email" id="guest-sender" name="sender" required>
+                
+                <label for="guest-receiver">Alıcı Email</label>
+                <input type="email" id="guest-receiver" name="receiver" required>
+                
+                <label for="guest-file">Dosya Seç (Max 1GB)</label>
+                <input type="file" id="guest-file" name="file" required>
+                <div class="file-info">Maksimum dosya boyutu: 1GB</div>
+                
+                <button type="submit">Yükle ve Gönder</button>
+                <div id="guest-message"></div>
+            </form>
+        </div>
+
+        <!-- Authenticated Upload (Shown after login) -->
         <div id="upload-section">
             <h2>Dosya Transferi</h2>
-            <p>Hoş geldin! Dosya yükleyebilirsin.</p>
+            <p class="welcome">Hoş geldin! Güvenli dosya yükleyebilirsin.</p>
             <form id="upload-form" enctype="multipart/form-data">
                 <label for="sender">Gönderen Email (Senin emailin)</label>
                 <input type="email" id="sender" name="sender" readonly>
-
+                
                 <label for="receiver">Alıcı Email</label>
                 <input type="email" id="receiver" name="receiver" required>
-
+                
                 <label for="file">Dosya Seç (Max 1GB)</label>
                 <input type="file" id="file" name="file" required>
                 <div class="file-info">Maksimum dosya boyutu: 1GB</div>
-
+                
                 <button type="submit">Yükle ve Gönder</button>
                 <div id="upload-message"></div>
             </form>
+            <button class="view-history" onclick="fetchHistory()">Geçmiş Gönderimleri Görüntüle</button>
+            <div id="history-section">
+                <h3>Geçmiş Gönderimler</h3>
+                <table id="history-table">
+                    <thead>
+                        <tr>
+                            <th>Dosya Adı</th>
+                            <th>Boyut (Byte)</th>
+                            <th>Alıcı Email</th>
+                            <th>Gönderim Tarihi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
             <button class="logout" onclick="logout()">Çıkış Yap</button>
         </div>
     </div>
@@ -194,134 +258,187 @@
     <script>
         // Tab switching
         function showTab(tabName) {
-            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
 
-            // Show selected tab
             document.getElementById(tabName).classList.add('active');
-
-            // Activate corresponding button
+            
             const button = document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`);
             if (button) {
                 button.classList.add('active');
             }
 
-            // Hide upload if not logged in
             if (tabName !== 'upload' && isLoggedIn()) {
                 showTab('upload');
             }
         }
 
-        // Check if logged in (JWT in localStorage)
+        // Check if logged in
         function isLoggedIn() {
             return localStorage.getItem('jwt_token') !== null;
         }
 
-        // Auto-show upload if already logged in
+        // Auto-show upload if logged in
         if (isLoggedIn()) {
             document.getElementById('sender').value = localStorage.getItem('user_email');
             document.getElementById('upload-section').style.display = 'block';
-            document.querySelector('.tab-buttons').style.display = 'none'; // Hide tabs after login
+            document.querySelector('.tab-buttons').style.display = 'none';
         }
 
-        // Register form handler
-        document.getElementById('register-form').addEventListener('submit', function (e) {
+        // Register handler
+        document.getElementById('register-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const messageDiv = document.getElementById('reg-message');
-
+            
             fetch('/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.message) {
-                        messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
-                        // Auto-switch to login after successful register
-                        showTab('login');
-                    } else {
-                        messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                    }
-                })
-                .catch(err => {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-                });
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
+                    showTab('login');
+                } else {
+                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                }
+            })
+            .catch(err => {
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+            });
         });
 
-        // Login form handler
-        document.getElementById('login-form').addEventListener('submit', function (e) {
+        // Login handler
+        document.getElementById('login-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const messageDiv = document.getElementById('login-message');
-
+            
             fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.token) {
-                        localStorage.setItem('jwt_token', data.token);
-                        localStorage.setItem('user_email', email);
-                        messageDiv.innerHTML = `<div class="success">Giriş başarılı! Yönlendiriliyor...</div>`;
-                        document.getElementById('sender').value = email;
-                        document.getElementById('upload-section').style.display = 'block';
-                        document.querySelector('.tab-buttons').style.display = 'none'; // Hide tabs after login
-                        setTimeout(() => showTab('upload'), 1000);
-                    } else {
-                        messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
-                    }
-                })
-                .catch(err => {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-                });
+            .then(response => response.json())
+            .then(data => {
+                if (data.token) {
+                    localStorage.setItem('jwt_token', data.token);
+                    localStorage.setItem('user_email', email);
+                    messageDiv.innerHTML = `<div class="success">Giriş başarılı! Yönlendiriliyor...</div>`;
+                    document.getElementById('sender').value = email;
+                    document.getElementById('upload-section').style.display = 'block';
+                    document.querySelector('.tab-buttons').style.display = 'none';
+                    setTimeout(() => showTab('upload'), 1000);
+                } else {
+                    messageDiv.innerHTML = `<div class="error">${data.error}</div>`;
+                }
+            })
+            .catch(err => {
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+            });
         });
 
-        // Upload form handler (with JWT)
-        document.getElementById('upload-form').addEventListener('submit', function (e) {
+        // Authenticated upload handler
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(this);
             const token = localStorage.getItem('jwt_token');
             const messageDiv = document.getElementById('upload-message');
-
+            
             fetch('/upload', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             })
-                .then(async response => {
-                    const data = await response.text()
-
-                    if (response.ok) {
-                        messageDiv.innerHTML = `<div class="success">${data}</div>`;
-                        this.reset(); // Clear form
-                    } else {
-                        messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
-                    }
-                })
-                .catch(err => {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
-                });
+            .then(response => response.text())
+            .then(data => {
+                if (response.ok) {
+                    messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                    this.reset();
+                } else {
+                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
+                }
+            })
+            .catch(err => {
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+            });
         });
+
+        // Guest upload handler (no token)
+        document.getElementById('guest-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const messageDiv = document.getElementById('guest-message');
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (response.ok) {
+                    messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                    this.reset();
+                } else {
+                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
+                }
+            })
+            .catch(err => {
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+            });
+        });
+
+        // Fetch history
+        function fetchHistory() {
+            const token = localStorage.getItem('jwt_token');
+            const historySection = document.getElementById('history-section');
+            const tableBody = document.getElementById('history-table').querySelector('tbody');
+            tableBody.innerHTML = ''; // Clear previous
+
+            fetch('/history', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.file_name}</td>
+                            <td>${item.file_size}</td>
+                            <td>${item.receiver_email}</td>
+                            <td>${item.created_at}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                    historySection.style.display = 'block';
+                } else {
+                    historySection.innerHTML = '<div class="error">Geçmiş bulunamadı</div>';
+                }
+            })
+            .catch(err => {
+                historySection.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+            });
+        }
 
         // Logout
         function logout() {
             localStorage.removeItem('jwt_token');
             localStorage.removeItem('user_email');
             document.getElementById('upload-section').style.display = 'none';
+            document.getElementById('history-section').style.display = 'none';
             document.querySelector('.tab-buttons').style.display = 'flex';
             showTab('login');
             document.getElementById('login-form').reset();
             document.getElementById('register-form').reset();
             document.getElementById('upload-form').reset();
+            document.getElementById('guest-form').reset();
         }
     </script>
 </body>
-
 </html>
