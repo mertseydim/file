@@ -16,11 +16,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 func main() {
 	appDomain = os.Getenv("APP_DOMAIN")
 	if appDomain == "" {
-		appDomain = "http://localhost:3000"
+		appDomain = "http://:mertseydim.com.tr"
 	}
 	if string(jwtSecret) == "" {
 		log.Fatal("JWT_SECRET environment variable not set")
@@ -53,26 +53,25 @@ func main() {
 
 	app.Post("/register", register)
 	app.Post("/login", login)
-
 	app.Post("/upload", uploadFile)
-
-	app.Get("/history", jwtMiddleware, getHistory) // New: Protected history endpoint
-
+	app.Get("/history", jwtMiddleware, getHistory)
 	app.Get("/download/:link", downloadFile)
 
-	initDB()
+	if err := initDB(); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
 
 	log.Fatal(app.Listen(":3000"))
 }
 
-func initDB() {
+func initDB() error {
 	user := os.Getenv("DB_USER")
 	if user == "" {
 		user = "root"
 	}
 	pass := os.Getenv("DB_PASS")
 	if pass == "" {
-		log.Fatal("DB_PASS environment variable not set")
+		return fmt.Errorf("DB_PASS environment variable not set")
 	}
 	config := mysql.Config{
 		User:   user,
@@ -80,18 +79,14 @@ func initDB() {
 		Net:    "tcp",
 		Addr:   "127.0.0.1:3306",
 		DBName: "file_transfer_db",
-		Params: map[string]string{
-			"parseTime": "true",
-			"loc":       "Europe/Istanbul",
-		},
 	}
 	var err error
 	db, err = sql.Open("mysql", config.FormatDSN())
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 	if err = db.Ping(); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	_, err = db.Exec(`
@@ -108,7 +103,7 @@ func initDB() {
 		)
 	`)
 	if err != nil {
-		log.Fatal("Failed to create files table:", err)
+		return fmt.Errorf("failed to create files table: %w", err)
 	}
 
 	_, err = db.Exec(`
@@ -120,8 +115,9 @@ func initDB() {
 		)
 	`)
 	if err != nil {
-		log.Fatal("Failed to create users table:", err)
+		return fmt.Errorf("failed to create users table: %w", err)
 	}
+	return nil
 }
 
 func register(c *fiber.Ctx) error {
@@ -131,6 +127,7 @@ func register(c *fiber.Ctx) error {
 	}
 	var req RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("Register body parse error: %v", err)
 		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz istek"})
 	}
 
@@ -144,6 +141,7 @@ func register(c *fiber.Ctx) error {
 	var exists int
 	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", req.Email).Scan(&exists)
 	if err != nil {
+		log.Printf("Register DB query error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 	if exists > 0 {
@@ -152,11 +150,13 @@ func register(c *fiber.Ctx) error {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		log.Printf("Password hash error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Şifre hashleme hatası"})
 	}
 
 	_, err = db.Exec("INSERT INTO users (email, password_hash) VALUES (?, ?)", req.Email, hash)
 	if err != nil {
+		log.Printf("Register DB insert error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Kayıt hatası"})
 	}
 
@@ -170,6 +170,7 @@ func login(c *fiber.Ctx) error {
 	}
 	var req LoginRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("Login body parse error: %v", err)
 		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz istek"})
 	}
 
@@ -179,6 +180,7 @@ func login(c *fiber.Ctx) error {
 	if err == sql.ErrNoRows {
 		return c.Status(401).JSON(fiber.Map{"error": "Geçersiz email veya şifre"})
 	} else if err != nil {
+		log.Printf("Login DB query error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 
@@ -193,6 +195,7 @@ func login(c *fiber.Ctx) error {
 	})
 	tokenString, err := token.SignedString(jwtSecret)
 	if err != nil {
+		log.Printf("Token creation error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Token oluşturma hatası"})
 	}
 
@@ -213,11 +216,21 @@ func jwtMiddleware(c *fiber.Ctx) error {
 		return jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
+		log.Printf("Invalid token: %v", err)
 		return c.Status(401).JSON(fiber.Map{"error": "Geçersiz token"})
 	}
 
-	claims := token.Claims.(jwt.MapClaims)
-	c.Locals("user_id", claims["user_id"])
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		log.Printf("Invalid JWT claims")
+		return c.Status(500).JSON(fiber.Map{"error": "Geçersiz token içeriği"})
+	}
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		log.Printf("Invalid user_id in claims")
+		return c.Status(500).JSON(fiber.Map{"error": "Geçersiz kullanıcı kimliği"})
+	}
+	c.Locals("user_id", userID)
 	c.Locals("user_email", claims["email"])
 
 	return c.Next()
@@ -225,10 +238,10 @@ func jwtMiddleware(c *fiber.Ctx) error {
 
 func uploadFile(c *fiber.Ctx) error {
 	var sender string
-	var senderID *int // Nullable for guests
+	var senderID *int
+	var fileType string
 	auth := c.Get("Authorization")
 	if auth != "" && strings.HasPrefix(auth, "Bearer ") {
-		// Authenticated: Validate token
 		tokenString := strings.TrimPrefix(auth, "Bearer ")
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -237,14 +250,27 @@ func uploadFile(c *fiber.Ctx) error {
 			return jwtSecret, nil
 		})
 		if err != nil || !token.Valid {
+			log.Printf("Upload token validation error: %v", err)
 			return c.Status(401).JSON(fiber.Map{"error": "Geçersiz token"})
 		}
-		claims := token.Claims.(jwt.MapClaims)
-		sender = claims["email"].(string)
-		id := int(claims["user_id"].(float64))
-		senderID = &id
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			log.Printf("Invalid JWT claims in upload")
+			return c.Status(500).JSON(fiber.Map{"error": "Geçersiz token içeriği"})
+		}
+		sender, ok = claims["email"].(string)
+		if !ok {
+			log.Printf("Invalid email in claims")
+			return c.Status(500).JSON(fiber.Map{"error": "Geçersiz email"})
+		}
+		id, ok := claims["user_id"].(float64)
+		if !ok {
+			log.Printf("Invalid user_id in claims")
+			return c.Status(500).JSON(fiber.Map{"error": "Geçersiz kullanıcı kimliği"})
+		}
+		idInt := int(id)
+		senderID = &idInt
 	} else {
-		// Guest: Use form sender
 		sender = c.FormValue("sender")
 		if sender == "" || !isValidEmail(sender) {
 			return c.Status(400).SendString("Geçersiz gönderen email")
@@ -258,10 +284,19 @@ func uploadFile(c *fiber.Ctx) error {
 
 	file, err := c.FormFile("file")
 	if err != nil {
+		log.Printf("Upload file error: %v", err)
 		return c.Status(400).SendString("Dosya yüklenemedi")
 	}
 	if file.Size > 1024*1024*1024 {
 		return c.Status(400).SendString("Dosya 1GB'dan büyük")
+	}
+
+	// Extract file type (extension)
+	fileType = filepath.Ext(file.Filename)
+	if fileType != "" {
+		fileType = strings.ToLower(strings.TrimPrefix(fileType, ".")) // e.g., "pdf" instead of ".pdf"
+	} else {
+		fileType = "unknown"
 	}
 
 	safeFilename := sanitizeFilename(file.Filename)
@@ -269,24 +304,26 @@ func uploadFile(c *fiber.Ctx) error {
 	link := uuid.New().String()
 	dir := "./uploads"
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		log.Printf("Upload directory creation error: %v", err)
 		return c.Status(500).SendString("Dizin oluşturma hatası")
 	}
 	path := filepath.Join(dir, link+"_"+safeFilename)
 	if err := c.SaveFile(file, path); err != nil {
+		log.Printf("File save error: %v", err)
 		return c.Status(500).SendString("Dosya kaydetme hatası")
 	}
 
 	_, err = db.Exec("INSERT INTO files (sender_id, sender_email, receiver_email, file_name, file_size, file_path, download_link) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		senderID, sender, receiver, file.Filename, file.Size, path, link)
 	if err != nil {
-		log.Println("DB insert error:", err)
+		log.Printf("Upload DB insert error: %v", err)
 		os.Remove(path)
 		return c.Status(500).SendString("Veritabanı hatası")
 	}
 
 	downloadLink := fmt.Sprintf("%s/download/%s", appDomain, link)
-	if err := sendEmail(receiver, sender, file.Filename, downloadLink); err != nil {
-		log.Println("Email gönderme hatası:", err)
+	if err := sendEmail(receiver, sender, file.Filename, file.Size, fileType, downloadLink); err != nil {
+		log.Printf("Email sending error: %v", err)
 		return c.Status(500).SendString("Dosya yüklendi ancak email gönderilemedi")
 	}
 
@@ -294,11 +331,15 @@ func uploadFile(c *fiber.Ctx) error {
 }
 
 func getHistory(c *fiber.Ctx) error {
-	userID := c.Locals("user_id").(float64) // From JWT
+	userID, ok := c.Locals("user_id").(float64)
+	if !ok {
+		log.Printf("Invalid user_id in history")
+		return c.Status(500).JSON(fiber.Map{"error": "Geçersiz kullanıcı kimliği"})
+	}
 
 	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", userID)
 	if err != nil {
-		log.Println("DB query error:", err)
+		log.Printf("History DB query error: %v", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 	defer rows.Close()
@@ -309,11 +350,9 @@ func getHistory(c *fiber.Ctx) error {
 		var fileSize int64
 		var createdAt time.Time
 		if err := rows.Scan(&fileName, &fileSize, &receiverEmail, &createdAt); err != nil {
-			log.Println("DB query error:", err)
-
+			log.Printf("History scan error: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "Sorgu hatası"})
 		}
-		createdAt = createdAt.Add(3 * time.Hour)
 		history = append(history, fiber.Map{
 			"file_name":      fileName,
 			"file_size":      fileSize,
@@ -330,10 +369,12 @@ func downloadFile(c *fiber.Ctx) error {
 	var path, name string
 	err := db.QueryRow("SELECT file_path, file_name FROM files WHERE download_link = ?", link).Scan(&path, &name)
 	if err != nil {
+		log.Printf("Download DB query error: %v", err)
 		return c.Status(404).SendString("Dosya bulunamadı")
 	}
 	file, err := os.Open(path)
 	if err != nil {
+		log.Printf("File open error: %v", err)
 		return c.Status(500).SendString("Dosya açma hatası")
 	}
 	defer file.Close()
@@ -341,25 +382,29 @@ func downloadFile(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/octet-stream")
 	_, err = io.Copy(c.Response().BodyWriter(), file)
 	if err != nil {
-		return err
+		log.Printf("File copy error: %v", err)
+		return c.Status(500).SendString("Dosya indirme hatası")
 	}
 
-	// Cleanup: Delete file only, keep DB record for history
+	// Cleanup: Delete file only
 	defer os.Remove(path)
 
 	return nil
 }
 
-func sendEmail(to, from, filename, link string) error {
+func sendEmail(to, from, filename string, fileSize int64, fileType, link string) error {
 	apiKey := os.Getenv("SENDGRID_API_KEY")
 	if apiKey == "" {
 		return fmt.Errorf("SENDGRID_API_KEY ortam değişkeni ayarlanmadı")
 	}
 
-	fromEmail := mail.NewEmail("Gönderen", "mertseydim@gmail.com")
+	// Format file size for readability (e.g., KB, MB)
+	fileSizeStr := formatFileSize(fileSize)
+
+	fromEmail := mail.NewEmail("Gönderen", from)
 	toEmail := mail.NewEmail("Alıcı", to)
 	subject := "Yeni Dosya Transferi"
-	plainTextContent := fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi. İndirmek için: %s", from, filename, link)
+	plainTextContent := fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi.\nDosya Türü: %s\nBoyut: %s\nİndirmek için: %s", from, filename, fileType, fileSizeStr, link)
 	htmlContent := fmt.Sprintf(`
 	<!DOCTYPE html>
 	<html lang="tr">
@@ -379,11 +424,13 @@ func sendEmail(to, from, filename, link string) error {
 			<h2>Yeni Dosya Transferi</h2>
 			<p>Merhaba,</p>
 			<p>%s size <strong>%s</strong> dosyasını gönderdi.</p>
+			<p><strong>Dosya Türü:</strong> %s</p>
+			<p><strong>Boyut:</strong> %s</p>
 			<p>İndirmek için aşağıdaki bağlantıya tıklayın:</p>
 			<a href="%s">Dosyayı İndir</a>
 		</div>
 	</body>
-	</html>`, from, filename, link)
+	</html>`, from, filename, fileType, fileSizeStr, link)
 
 	message := mail.NewSingleEmail(fromEmail, subject, toEmail, plainTextContent, htmlContent)
 	client := sendgrid.NewSendClient(apiKey)
@@ -395,6 +442,22 @@ func sendEmail(to, from, filename, link string) error {
 		return fmt.Errorf("email gönderme başarısız: %d - %s", response.StatusCode, response.Body)
 	}
 	return nil
+}
+
+func formatFileSize(size int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+	if size >= GB {
+		return fmt.Sprintf("%.2f GB", float64(size)/float64(GB))
+	} else if size >= MB {
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(MB))
+	} else if size >= KB {
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(KB))
+	}
+	return fmt.Sprintf("%d bytes", size)
 }
 
 func isValidEmail(email string) bool {

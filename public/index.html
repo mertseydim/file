@@ -95,6 +95,7 @@
             font-size: 16px;
             font-weight: 700;
             transition: background-color 0.3s, transform 0.2s;
+            position: relative;
         }
         button:hover {
             background-color: #0056b3;
@@ -159,6 +160,29 @@
         .view-history:hover {
             background-color: #218838;
         }
+        .spinner {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        @keyframes spin {
+            0% { transform: translateY(-50%) rotate(0deg); }
+            100% { transform: translateY(-50%) rotate(360deg); }
+        }
+        button.loading .spinner {
+            display: inline-block;
+        }
+        button.loading span {
+            visibility: hidden;
+        }
     </style>
 </head>
 <body>
@@ -213,7 +237,7 @@
                 <input type="file" id="guest-file" name="file" required>
                 <div class="file-info">Maksimum dosya boyutu: 1GB</div>
                 
-                <button type="submit">Yükle ve Gönder</button>
+                <button type="submit"><span>Yükle ve Gönder</span><div class="spinner"></div></button>
                 <div id="guest-message"></div>
             </form>
         </div>
@@ -233,7 +257,7 @@
                 <input type="file" id="file" name="file" required>
                 <div class="file-info">Maksimum dosya boyutu: 1GB</div>
                 
-                <button type="submit">Yükle ve Gönder</button>
+                <button type="submit"><span>Yükle ve Gönder</span><div class="spinner"></div></button>
                 <div id="upload-message"></div>
             </form>
             <button class="view-history" onclick="fetchHistory()">Geçmiş Gönderimleri Görüntüle</button>
@@ -291,7 +315,9 @@
             const email = document.getElementById('reg-email').value;
             const password = document.getElementById('reg-password').value;
             const messageDiv = document.getElementById('reg-message');
-            
+            const button = this.querySelector('button');
+            button.disabled = true;
+
             fetch('/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -312,7 +338,10 @@
                 }
             })
             .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
+            })
+            .finally(() => {
+                button.disabled = false;
             });
         });
 
@@ -322,7 +351,9 @@
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const messageDiv = document.getElementById('login-message');
-            
+            const button = this.querySelector('button');
+            button.disabled = true;
+
             fetch('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -348,7 +379,10 @@
                 }
             })
             .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
+            })
+            .finally(() => {
+                button.disabled = false;
             });
         });
 
@@ -358,7 +392,10 @@
             const formData = new FormData(this);
             const token = localStorage.getItem('jwt_token');
             const messageDiv = document.getElementById('upload-message');
-            
+            const button = this.querySelector('button');
+            button.classList.add('loading');
+            button.disabled = true;
+
             fetch('/upload', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
@@ -366,7 +403,7 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Hata: ${response.statusText}`);
+                    throw new Error(response.statusText || 'Sunucu hatası');
                 }
                 return response.text();
             })
@@ -375,7 +412,11 @@
                 this.reset();
             })
             .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
+            })
+            .finally(() => {
+                button.classList.remove('loading');
+                button.disabled = false;
             });
         });
 
@@ -384,14 +425,17 @@
             e.preventDefault();
             const formData = new FormData(this);
             const messageDiv = document.getElementById('guest-message');
-            
+            const button = this.querySelector('button');
+            button.classList.add('loading');
+            button.disabled = true;
+
             fetch('/upload', {
                 method: 'POST',
                 body: formData
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Hata: ${response.statusText}`);
+                    throw new Error(response.statusText || 'Sunucu hatası');
                 }
                 return response.text();
             })
@@ -400,7 +444,11 @@
                 this.reset();
             })
             .catch(err => {
-                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
+            })
+            .finally(() => {
+                button.classList.remove('loading');
+                button.disabled = false;
             });
         });
 
@@ -409,7 +457,7 @@
             const token = localStorage.getItem('jwt_token');
             const historySection = document.getElementById('history-section');
             const tableBody = document.getElementById('history-table').querySelector('tbody');
-            tableBody.innerHTML = ''; // Clear previous
+            tableBody.innerHTML = '';
 
             fetch('/history', {
                 method: 'GET',
@@ -417,7 +465,7 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Hata: ${response.statusText}`);
+                    throw new Error(response.statusText || 'Sunucu hatası');
                 }
                 return response.json();
             })
@@ -439,7 +487,7 @@
                 }
             })
             .catch(err => {
-                historySection.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
+                historySection.innerHTML = `<div class="error">Bir hata oluştu: ${err.message}</div>`;
             });
         }
 
