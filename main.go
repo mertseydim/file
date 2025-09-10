@@ -305,6 +305,8 @@ func getHistory(c *fiber.Ctx) error {
 		var fileSize int64
 		var createdAt time.Time
 		if err := rows.Scan(&fileName, &fileSize, &receiverEmail, &createdAt); err != nil {
+			log.Println("DB query error:", err)
+
 			return c.Status(500).JSON(fiber.Map{"error": "Sorgu hatası"})
 		}
 		history = append(history, fiber.Map{
