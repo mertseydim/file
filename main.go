@@ -76,7 +76,9 @@ func main() {
 	app.Post("/login", login)
 	app.Post("/upload", uploadFile)
 	app.Get("/history", jwtMiddleware, getHistory)
-	app.Get("/download/:link", downloadFile)
+	app.Get("/download/:link", serveDownloadPage)
+	app.Get("/api/file-info/:link", getFileInfo)
+	app.Get("/download/file/:link", downloadFile)
 
 	// Kullanıcı profili route'ları
 	app.Get("/api/profile", jwtMiddleware, getProfile)
@@ -386,7 +388,7 @@ func uploadFile(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Veritabanı hatası")
 	}
 
-	downloadLink := fmt.Sprintf("%s/download/%s", appDomain, link)
+	downloadLink := fmt.Sprintf("%s/download/file/%s", appDomain, link)
 	if err := sendEmail(receiver, sender, file.Filename, file.Size, fileType, downloadLink); err != nil {
 		log.Printf("Email sending error: %v", err)
 		return c.Status(500).SendString("Dosya yüklendi ancak email gönderilemedi")
@@ -463,6 +465,40 @@ func getHistory(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(history)
+}
+
+func serveDownloadPage(c *fiber.Ctx) error {
+	return c.SendFile("./public/download/index.html")
+}
+
+func getFileInfo(c *fiber.Ctx) error {
+	link := c.Params("link")
+
+	var fileInfo struct {
+		FileName    string    `json:"file_name"`
+		FileSize    int64     `json:"file_size"`
+		SenderEmail string    `json:"sender_email"`
+		CreatedAt   time.Time `json:"created_at"`
+	}
+
+	err := db.QueryRow(`
+		SELECT file_name, file_size, sender_email, created_at 
+		FROM files 
+		WHERE download_link = ?`, link).Scan(
+		&fileInfo.FileName,
+		&fileInfo.FileSize,
+		&fileInfo.SenderEmail,
+		&fileInfo.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return c.Status(404).JSON(fiber.Map{"error": "Dosya bulunamadı"})
+	} else if err != nil {
+		log.Printf("File info query error: %v", err)
+		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
+	}
+
+	return c.JSON(fileInfo)
 }
 
 func downloadFile(c *fiber.Ctx) error {
