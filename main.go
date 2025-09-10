@@ -80,6 +80,9 @@ func initDB() {
 		Net:    "tcp",
 		Addr:   "127.0.0.1:3306",
 		DBName: "file_transfer_db",
+		Params: map[string]string{
+			"parseTime": "true",
+		},
 	}
 	var err error
 	db, err = sql.Open("mysql", config.FormatDSN())
