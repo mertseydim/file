@@ -73,6 +73,11 @@ func main() {
 	app.Get("/history", jwtMiddleware, getHistory)
 	app.Get("/download/:link", downloadFile)
 
+	// Kullanıcı profili route'ları
+	app.Get("/api/profile", jwtMiddleware, getProfile)
+	app.Put("/api/profile/password", jwtMiddleware, updatePassword)
+	app.Get("/api/profile/stats", jwtMiddleware, getProfileStats)
+
 	if err := initDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
@@ -495,6 +500,106 @@ func sendEmail(to, from, filename string, fileSize int64, fileType, link string)
 		return fmt.Errorf("email gönderme başarısız: %d - %s", response.StatusCode, response.Body)
 	}
 	return nil
+}
+
+// Kullanıcı profil bilgilerini getir
+func getProfile(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
+	userEmail := c.Locals("user_email").(string)
+
+	var createdAt time.Time
+	err := db.QueryRow("SELECT created_at FROM users WHERE id = ?", int(userID)).Scan(&createdAt)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Kullanıcı bilgileri alınamadı"})
+	}
+
+	return c.JSON(fiber.Map{
+		"id":         userID,
+		"email":      userEmail,
+		"created_at": createdAt.Format("2006-01-02 15:04:05"),
+	})
+}
+
+// Şifre güncelleme
+func updatePassword(c *fiber.Ctx) error {
+	type PasswordUpdate struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+
+	userID := c.Locals("user_id").(float64)
+	var req PasswordUpdate
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Geçersiz istek"})
+	}
+
+	if len(req.NewPassword) < 8 {
+		return c.Status(400).JSON(fiber.Map{"error": "Yeni şifre en az 8 karakter olmalı"})
+	}
+
+	// Mevcut şifreyi kontrol et
+	var currentHash string
+	err := db.QueryRow("SELECT password_hash FROM users WHERE id = ?", int(userID)).Scan(&currentHash)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+		return c.Status(401).JSON(fiber.Map{"error": "Mevcut şifre yanlış"})
+	}
+
+	// Yeni şifreyi hashle ve güncelle
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Şifre hashleme hatası"})
+	}
+
+	_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newHash, int(userID))
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Şifre güncelleme hatası"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Şifre başarıyla güncellendi"})
+}
+
+// Kullanıcı istatistiklerini getir
+func getProfileStats(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(float64)
+
+	var stats struct {
+		TotalUploads    int     `json:"total_uploads"`
+		TotalSize       int64   `json:"total_size"`
+		AvgFileSize     float64 `json:"avg_file_size"`
+		UniqueReceivers int     `json:"unique_receivers"`
+	}
+
+	// Toplam yükleme ve boyut
+	err := db.QueryRow(`
+		SELECT 
+			COUNT(*) as total_uploads,
+			COALESCE(SUM(file_size), 0) as total_size,
+			COALESCE(AVG(file_size), 0) as avg_size
+		FROM files 
+		WHERE sender_id = ?`, int(userID)).Scan(&stats.TotalUploads, &stats.TotalSize, &stats.AvgFileSize)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "İstatistikler alınamadı"})
+	}
+
+	// Benzersiz alıcı sayısı
+	err = db.QueryRow(`
+		SELECT COUNT(DISTINCT receiver_email) 
+		FROM files 
+		WHERE sender_id = ?`, int(userID)).Scan(&stats.UniqueReceivers)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "İstatistikler alınamadı"})
+	}
+
+	return c.JSON(fiber.Map{
+		"stats":                stats,
+		"total_size_formatted": formatFileSize(stats.TotalSize),
+		"avg_size_formatted":   formatFileSize(int64(stats.AvgFileSize)),
+	})
 }
 
 func formatFileSize(size int64) string {
