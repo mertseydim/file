@@ -100,11 +100,13 @@ func initDB() error {
 		return fmt.Errorf("DB_PASS environment variable not set")
 	}
 	config := mysql.Config{
-		User:   user,
-		Passwd: pass,
-		Net:    "tcp",
-		Addr:   "127.0.0.1:3306",
-		DBName: "file_transfer_db",
+		User:      user,
+		Passwd:    pass,
+		Net:       "tcp",
+		Addr:      "127.0.0.1:3306",
+		DBName:    "file_transfer_db",
+		ParseTime: true,
+		Loc:       time.Local,
 	}
 	var err error
 	db, err = sql.Open("mysql", config.FormatDSN())
