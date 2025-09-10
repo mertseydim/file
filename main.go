@@ -16,11 +16,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -275,6 +275,7 @@ func uploadFile(c *fiber.Ctx) error {
 	_, err = db.Exec("INSERT INTO files (sender_id, sender_email, receiver_email, file_name, file_size, file_path, download_link) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		senderID, sender, receiver, file.Filename, file.Size, path, link)
 	if err != nil {
+		log.Println("DB insert error:", err)
 		os.Remove(path)
 		return c.Status(500).SendString("Veritabanı hatası")
 	}
