@@ -297,7 +297,12 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Hata: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.message) {
                     messageDiv.innerHTML = `<div class="success">${data.message}</div>`;
@@ -323,7 +328,12 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Hata: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.token) {
                     localStorage.setItem('jwt_token', data.token);
@@ -354,14 +364,15 @@
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             })
-            .then(response => response.text())
-            .then(data => {
-                if (response.ok) {
-                    messageDiv.innerHTML = `<div class="success">${data}</div>`;
-                    this.reset();
-                } else {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Hata: ${response.statusText}`);
                 }
+                return response.text();
+            })
+            .then(data => {
+                messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                this.reset();
             })
             .catch(err => {
                 messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
@@ -378,14 +389,15 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.text())
-            .then(data => {
-                if (response.ok) {
-                    messageDiv.innerHTML = `<div class="success">${data}</div>`;
-                    this.reset();
-                } else {
-                    messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${data}</div>`;
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Hata: ${response.statusText}`);
                 }
+                return response.text();
+            })
+            .then(data => {
+                messageDiv.innerHTML = `<div class="success">${data}</div>`;
+                this.reset();
             })
             .catch(err => {
                 messageDiv.innerHTML = `<div class="error">Bir hata oluştu: ${err}</div>`;
@@ -403,7 +415,12 @@
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Hata: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (Array.isArray(data)) {
                     data.forEach(item => {
