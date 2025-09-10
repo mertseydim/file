@@ -294,6 +294,7 @@ func getHistory(c *fiber.Ctx) error {
 
 	rows, err := db.Query("SELECT file_name, file_size, receiver_email, created_at FROM files WHERE sender_id = ? ORDER BY created_at DESC", userID)
 	if err != nil {
+		log.Println("DB query error:", err)
 		return c.Status(500).JSON(fiber.Map{"error": "Veritabanı hatası"})
 	}
 	defer rows.Close()
@@ -348,7 +349,7 @@ func sendEmail(to, from, filename, link string) error {
 		return fmt.Errorf("SENDGRID_API_KEY ortam değişkeni ayarlanmadı")
 	}
 
-	fromEmail := mail.NewEmail("Gönderen", from)
+	fromEmail := mail.NewEmail("Gönderen", "mertseydim@gmail.com")
 	toEmail := mail.NewEmail("Alıcı", to)
 	subject := "Yeni Dosya Transferi"
 	plainTextContent := fmt.Sprintf("Merhaba, %s size %s dosyasını gönderdi. İndirmek için: %s", from, filename, link)
