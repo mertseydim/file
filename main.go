@@ -32,7 +32,7 @@ var (
 func main() {
 	appDomain = os.Getenv("APP_DOMAIN")
 	if appDomain == "" {
-		appDomain = "http://:mertseydim.com.tr"
+		appDomain = "http://localhost:3000"
 	}
 	if string(jwtSecret) == "" {
 		log.Fatal("JWT_SECRET environment variable not set")
